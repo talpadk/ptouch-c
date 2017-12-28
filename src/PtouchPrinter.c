@@ -24,6 +24,10 @@ void PtouchPrinter_addUsbError(PtouchPrinter *this, const char* error, enum libu
   fprintf(stderr, "%s %s (%d)\n", error, libusb_error_name(code), code);
 }
 
+void PtouchPrinter_addError(PtouchPrinter *this, const char* error){
+  fprintf(stderr, "%s\n", error);
+}
+
 uint8_t PtouchPrinter_initUsb(void){
   if (usbContext_!=0) { return 1; }
   
@@ -57,6 +61,7 @@ uint32_t PtouchPrinter_scanForPrinters(uint8_t printResults){
 
   if (numberOfDevices < 0){
     PtouchPrinter_addUsbError(0, "Failed to get device list", numberOfDevices);
+    return 0;
   }
   else {
     for (ssize_t i=0; i<numberOfDevices; i++){
@@ -66,14 +71,69 @@ uint32_t PtouchPrinter_scanForPrinters(uint8_t printResults){
 	numberOfDevicesFound++;
       }
     }
-    
     libusb_free_device_list(deviceList, 0);
   }
-
  return numberOfDevicesFound;
+}
+
+libusb_device *PtouchPrinter_findPrinterByIndex(PtouchPrinter *this, uint32_t index){
+  uint32_t numberOfDevicesFound = 0;
+  ssize_t numberOfDevices = libusb_get_device_list(usbContext_, &(this->deviceList));
+
+  if (numberOfDevices < 0){
+    PtouchPrinter_addUsbError(0, "Failed to get device list", numberOfDevices);
+    return 0;
+  }
+  else {
+    for (ssize_t i=0; i<numberOfDevices; i++){
+      uint32_t isSupported = PtouchPrinter_deviceIsSupported(this->deviceList[i]);
+      if (isSupported){
+	if (index==numberOfDevicesFound){
+	  return this->deviceList[i];
+	}
+	numberOfDevicesFound++;
+      }
+    }
+  }
+ return 0;
+}
+
+
+void PtouchPrinter_init(PtouchPrinter *this){
+  this->device = 0;
+  this->deviceList = 0;
+  this->deviceHandle = 0;
+  this->reattachKernelDriverWhenDone = 0;
 }
 
 
 uint8_t PtouchPrinter_createByIndex(PtouchPrinter *this, uint32_t index){
-  int result = 0;
+  enum libusb_error errorCode;
+
+  PtouchPrinter_init(this);
+  this->device = PtouchPrinter_findPrinterByIndex(this, index);
+  if (this->device==0){
+    PtouchPrinter_addError(this, "Unable to find the printer with the requested index");
+    return 0;
+  }
+
+  errorCode = libusb_open(this->device, &(this->deviceHandle));
+  if (errorCode != LIBUSB_SUCCESS){
+    this->deviceHandle = 0;
+    PtouchPrinter_addUsbError(this, "Unable to open the USB device", errorCode);
+    return 0;
+  }
+
+  //Attempt to detatch any kernel drivers for interface 0
+  errorCode = libusb_detach_kernel_driver(this->deviceHandle, 0);
+  if (errorCode == LIBUSB_SUCCESS){
+    this->reattachKernelDriverWhenDone = 1;
+  }
+  
+  errorCode = libusb_claim_interface(this->deviceHandle, 0);
+  if (errorCode != LIBUSB_SUCCESS){
+    PtouchPrinter_addUsbError(this, "Unable to claim USB device", errorCode);
+  }
+  
+  return 1;
 }

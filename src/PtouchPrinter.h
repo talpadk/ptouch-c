@@ -5,6 +5,10 @@
 #include <stdint.h>
 
 typedef struct {
+  libusb_device **deviceList;
+  libusb_device *device;
+  libusb_device_handle *deviceHandle;
+  uint8_t reattachKernelDriverWhenDone;
 } PtouchPrinter;
 
 /** 
