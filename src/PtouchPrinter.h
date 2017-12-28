@@ -1,7 +1,7 @@
 #ifndef PTOUCH_PRINTER
 #define PTOUCH_PRINTER
 
-#include <usb.h>
+#include <libusb.h>
 #include <stdint.h>
 
 typedef struct {
@@ -11,7 +11,7 @@ typedef struct {
  * Initialize the USB system, must be called once
  * 
  */
-void PtouchPrinter_initUsb(void);
+uint8_t PtouchPrinter_initUsb(void);
 
 /** 
  * Scans the USB busses and searches for supported devices

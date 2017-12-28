@@ -3,6 +3,9 @@
 
 #include <stdio.h>
 
+static libusb_context *usbContext_=0;
+
+	
 typedef struct {
   uint16_t vendor;
   uint16_t product;
@@ -17,21 +20,29 @@ PrinterId supportedPrinters_[NUMBER_OF_SUPPORTED_PRINTERS] = {
 };
 
 
-//void PtouchPrinter_addUsbError(PtouchPrinter *this, const char* error, libusb_error code){
-  //  fprintf(stderr, "%s %s (%d)\n", error, usb_error_name(code), code);
-//}
-
-void PtouchPrinter_initUsb(void){
-  usb_init();
-  usb_find_busses();
-  usb_find_devices();
+void PtouchPrinter_addUsbError(PtouchPrinter *this, const char* error, enum libusb_error code){
+  fprintf(stderr, "%s %s (%d)\n", error, libusb_error_name(code), code);
 }
 
+uint8_t PtouchPrinter_initUsb(void){
+  if (usbContext_!=0) { return 1; }
+  
+  int result = libusb_init(&usbContext_);
+  if (result != LIBUSB_SUCCESS){
+    PtouchPrinter_addUsbError(0,"Failed to open libUSB", result);
+    return 0;
+  }
+  return 1;
+}
 
-uint32_t PtouchPrinter_deviceIsSupported(struct usb_device *device){
+//Requires libusb >= 1.0.16 as we don't check for errors
+uint32_t PtouchPrinter_deviceIsSupported(libusb_device *device){
+  struct libusb_device_descriptor descriptor;
+  libusb_get_device_descriptor(device, &descriptor);
+  
   for (uint32_t i=0; i<NUMBER_OF_SUPPORTED_PRINTERS; i++){
-    if (device->descriptor.idVendor  == supportedPrinters_[i].vendor &&
-	device->descriptor.idProduct == supportedPrinters_[i].product){
+    if (descriptor.idVendor  == supportedPrinters_[i].vendor &&
+	descriptor.idProduct == supportedPrinters_[i].product){
       return i+1;
     }
   }
@@ -40,21 +51,26 @@ uint32_t PtouchPrinter_deviceIsSupported(struct usb_device *device){
 
 uint32_t PtouchPrinter_scanForPrinters(uint8_t printResults){
   uint32_t numberOfDevicesFound = 0;
-  struct usb_bus *busses = usb_get_busses();
 
-  struct usb_bus *bus;
-  for (bus = busses; bus; bus = bus->next) {
-    struct usb_device *dev;
-    for (dev = bus->devices; dev; dev = dev->next) {
-      uint32_t isSupported = PtouchPrinter_deviceIsSupported(dev);
+  libusb_device **deviceList;
+  ssize_t numberOfDevices = libusb_get_device_list(usbContext_, &deviceList);
+
+  if (numberOfDevices < 0){
+    PtouchPrinter_addUsbError(0, "Failed to get device list", numberOfDevices);
+  }
+  else {
+    for (ssize_t i=0; i<numberOfDevices; i++){
+      uint32_t isSupported = PtouchPrinter_deviceIsSupported(deviceList[i]);
       if (isSupported){
 	printf("#%d %s\n", numberOfDevicesFound, supportedPrinters_[isSupported-1].name);
 	numberOfDevicesFound++;
       }
     }
+    
+    libusb_free_device_list(deviceList, 0);
   }
 
-  return numberOfDevicesFound;
+ return numberOfDevicesFound;
 }
 
 

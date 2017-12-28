@@ -3,6 +3,11 @@
 #include "PtouchPrinter.h"
 
 int main(){
-  PtouchPrinter_initUsb();
+  if (!PtouchPrinter_initUsb()){
+    return 1;
+  }
   PtouchPrinter_scanForPrinters(1);
+
+
+  return 0;
 }
