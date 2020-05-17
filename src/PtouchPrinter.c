@@ -1,4 +1,5 @@
 #include "PtouchPrinter.h"
+
 #include <stdio.h>
 
 #define OUT_ENDPOINT (0x02)
@@ -147,9 +148,9 @@ void PtouchPrinter_updateStatusInformation(PtouchPrinter *this){
     this->statusInformationBuffer[0] = 0;
     return;
   }
+
   
-  printf("media width: %dmm\n", this->statusInformationBuffer[10]);
-  
+  PtouchPrinterStatus_updateStatusFromBuffer(&(this->printerStatus), this->statusInformationBuffer);
 }
 
 

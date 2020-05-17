@@ -12,5 +12,7 @@ int main(){
 
   PtouchPrinter_createByIndex(&printer, 0);
 
+  PtouchPrinterStatus_printToStdOut(&(printer.printerStatus));
+
   return 0;
 }

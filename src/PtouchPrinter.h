@@ -1,8 +1,13 @@
 #ifndef PTOUCH_PRINTER
 #define PTOUCH_PRINTER
 
+#include "PtouchPrinterStatus.h"
+
+
 #include <libusb.h>
 #include <stdint.h>
+
+
 
 typedef struct {
   libusb_device **deviceList;
@@ -11,6 +16,9 @@ typedef struct {
 
   uint8_t statusInformationBuffer[32]; //not valid if the first byte isn't 0x80
   uint8_t reattachKernelDriverWhenDone;
+
+  PtouchPrinterStatus printerStatus;
+  
 } PtouchPrinter;
 
 /** 
