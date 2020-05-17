@@ -8,6 +8,8 @@ typedef struct {
   libusb_device **deviceList;
   libusb_device *device;
   libusb_device_handle *deviceHandle;
+
+  uint8_t statusInformationBuffer[32]; //not valid if the first byte isn't 0x80
   uint8_t reattachKernelDriverWhenDone;
 } PtouchPrinter;
 

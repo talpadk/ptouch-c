@@ -1,7 +1,9 @@
 #include "PtouchPrinter.h"
-
-
 #include <stdio.h>
+
+#define OUT_ENDPOINT (0x02)
+#define  IN_ENDPOINT (0x81)
+
 
 static libusb_context *usbContext_=0;
 
@@ -104,6 +106,50 @@ void PtouchPrinter_init(PtouchPrinter *this){
   this->deviceList = 0;
   this->deviceHandle = 0;
   this->reattachKernelDriverWhenDone = 0;
+  this->statusInformationBuffer[0] = 0;
+}
+
+void PtouchPrinter_updateStatusInformation(PtouchPrinter *this){
+  enum libusb_error errorCode;
+  int numberOfBytesTransfered;
+  errorCode = libusb_bulk_transfer(this->deviceHandle, OUT_ENDPOINT, "\x1BiS", 3, &numberOfBytesTransfered, 3*1000);
+  if (errorCode != LIBUSB_SUCCESS){
+    PtouchPrinter_addUsbError(this, "Unable to send a request for status", errorCode);
+    this->statusInformationBuffer[0] = 0;
+    return;
+  }
+  if (numberOfBytesTransfered != 3){
+    PtouchPrinter_addError(this, "Request for status was send too short");
+    this->statusInformationBuffer[0] = 0;
+    return;
+  }
+  errorCode = libusb_bulk_transfer(this->deviceHandle, IN_ENDPOINT, this->statusInformationBuffer, 32, &numberOfBytesTransfered, 10*1000);
+  if (errorCode != LIBUSB_SUCCESS){
+    PtouchPrinter_addUsbError(this, "Unable to receive request for status", errorCode);
+    this->statusInformationBuffer[0] = 0;
+    return;
+  }
+  if (numberOfBytesTransfered != 32){
+    PtouchPrinter_addError(this, "Request for status was received too short");
+    this->statusInformationBuffer[0] = 0;
+    return;
+  }
+
+  if (this->statusInformationBuffer[0] != 0x80 ||
+      this->statusInformationBuffer[1] != 0x20 ||
+      this->statusInformationBuffer[2] != 0x42 ||
+      this->statusInformationBuffer[3] != 0x30){
+    PtouchPrinter_addError(this, "Unexpected status content, dumping content:");
+    for (int i=0; i<32; i++){
+      fprintf(stderr, "0x%02X ", this->statusInformationBuffer[i]);
+    }
+    fprintf(stderr, "\n");
+    this->statusInformationBuffer[0] = 0;
+    return;
+  }
+  
+  printf("media width: %dmm\n", this->statusInformationBuffer[10]);
+  
 }
 
 
@@ -134,6 +180,9 @@ uint8_t PtouchPrinter_createByIndex(PtouchPrinter *this, uint32_t index){
   if (errorCode != LIBUSB_SUCCESS){
     PtouchPrinter_addUsbError(this, "Unable to claim USB device", errorCode);
   }
+
+
+  PtouchPrinter_updateStatusInformation(this);
   
   return 1;
 }
